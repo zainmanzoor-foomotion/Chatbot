@@ -61,6 +61,12 @@ with st.sidebar:
 # --- Main chat area ---
 st.title("AI Chatbot")
 
+# Capture input early so it renders disabled immediately during streaming
+_user_input = st.chat_input(
+    "Type your message...",
+    disabled=st.session_state.is_responding
+)
+
 if st.session_state.pending_error:
     st.error(st.session_state.pending_error)
     st.session_state.pending_error = None
@@ -204,12 +210,9 @@ if st.session_state.pending_prompt and st.session_state.is_responding:
 if is_regen_streaming:
     render_message_block(messages[split:], index_offset=split)
 
-# --- Chat input (disabled while responding) ---
-if prompt := st.chat_input(
-    "Type your message...",
-    disabled=st.session_state.is_responding
-):
-    st.session_state.threads[current_thread].append({"role": "user", "content": prompt})
-    st.session_state.pending_prompt = prompt
+# --- Chat input handler ---
+if _user_input and not st.session_state.is_responding:
+    st.session_state.threads[current_thread].append({"role": "user", "content": _user_input})
+    st.session_state.pending_prompt = _user_input
     st.session_state.is_responding = True
     st.rerun()
