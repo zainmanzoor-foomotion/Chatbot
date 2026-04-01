@@ -33,7 +33,6 @@ A conversational AI chatbot built with **Streamlit**, **LangGraph**, and **Groq*
 ```
 Chatbot/
 ├── app.py                  # Streamlit UI entry point
-├── main.py                 # CLI entry point (placeholder)
 ├── requirements.txt        # Python dependencies
 ├── pyproject.toml          # Project metadata
 └── src/
