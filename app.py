@@ -11,7 +11,6 @@ os.environ['LANGSMITH_API_KEY'] = os.getenv('LANGSMITH_API_KEY', '')
 
 st.set_page_config(page_title="AI Chatbot", layout="wide")
 
-# Auto-scroll to bottom of page
 st.html("<script>window.parent.document.querySelector('section.main').scrollTo(0, window.parent.document.querySelector('section.main').scrollHeight);</script>")
 
 # --- Init session state ---
@@ -20,10 +19,16 @@ if "graph" not in st.session_state:
     st.session_state.graph = GraphBuilder(llm).build_graph()
 
 if "threads" not in st.session_state:
-    st.session_state.threads = {}  # {thread_id: [{"role": ..., "content": ...}]}
+    st.session_state.threads = {}
 
 if "pending_error" not in st.session_state:
     st.session_state.pending_error = None
+
+if "pending_prompt" not in st.session_state:
+    st.session_state.pending_prompt = None
+
+if "is_responding" not in st.session_state:
+    st.session_state.is_responding = False
 
 if "current_thread" not in st.session_state:
     tid = str(uuid.uuid4())[:8]
@@ -53,7 +58,6 @@ with st.sidebar:
 # --- Main chat area ---
 st.title("AI Chatbot")
 
-# Show persistent error from previous run (survives st.rerun)
 if st.session_state.pending_error:
     st.error(st.session_state.pending_error)
     st.session_state.pending_error = None
@@ -66,12 +70,20 @@ for msg in messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# User input
-if prompt := st.chat_input("Type your message..."):
+# --- Chat input (disabled while responding) ---
+if prompt := st.chat_input(
+    "Type your message...",
+    disabled=st.session_state.is_responding
+):
     st.session_state.threads[current_thread].append({"role": "user", "content": prompt})
+    st.session_state.pending_prompt = prompt
+    st.session_state.is_responding = True
+    st.rerun()  # Rerun immediately so input disables before streaming starts
 
-    with st.chat_message("user"):
-        st.markdown(prompt)
+# --- Stream response for pending prompt ---
+if st.session_state.pending_prompt and st.session_state.is_responding:
+    prompt = st.session_state.pending_prompt
+    st.session_state.pending_prompt = None
 
     config = {"configurable": {"thread_id": current_thread}}
 
@@ -89,7 +101,6 @@ if prompt := st.chat_input("Type your message..."):
                     config=config,
                     stream_mode="messages"
                 ):
-                    # Show which tools are running (accumulate all)
                     if isinstance(chunk, ToolMessage):
                         tool_name = getattr(chunk, "name", "tool")
                         if tool_name not in tools_used:
@@ -98,13 +109,11 @@ if prompt := st.chat_input("Type your message..."):
                         status.caption(f"Using tools: {tools_list}...")
                         continue
 
-                    # Skip tool-call request chunks (LLM deciding to call a tool)
                     has_tool_calls = bool(getattr(chunk, "tool_calls", [])) or \
                                      bool(getattr(chunk, "tool_call_chunks", []))
                     if has_tool_calls:
                         continue
 
-                    # Yield any AI text content (handles both AIMessageChunk and AIMessage)
                     if isinstance(chunk, (AIMessageChunk, AIMessage)) and chunk.content:
                         if first_token:
                             status.empty()
@@ -128,7 +137,18 @@ if prompt := st.chat_input("Type your message..."):
                 status.empty()
                 if full:
                     st.session_state.threads[current_thread].append({"role": "assistant", "content": full})
+                # Always unlock, even if response was empty
+                st.session_state.is_responding = False
 
-        st.write_stream(token_stream())
+        # Outer safety net in case write_stream itself throws
+        try:
+            st.write_stream(token_stream())
+        except Exception as e:
+            status.empty()
+            st.error(f"⚠️ Unexpected error: {e}")
+        finally:
+            # Guaranteed unlock no matter what
+            st.session_state.is_responding = False
+            st.session_state.pending_prompt = None
 
     st.rerun()
