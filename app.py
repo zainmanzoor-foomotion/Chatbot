@@ -30,6 +30,9 @@ if "pending_prompt" not in st.session_state:
 if "is_responding" not in st.session_state:
     st.session_state.is_responding = False
 
+if "regen_index" not in st.session_state:
+    st.session_state.regen_index = None
+
 if "current_thread" not in st.session_state:
     tid = str(uuid.uuid4())[:8]
     st.session_state.current_thread = tid
@@ -64,21 +67,35 @@ if st.session_state.pending_error:
 
 current_thread = st.session_state.current_thread
 messages = st.session_state.threads.get(current_thread, [])
+regen_idx = st.session_state.regen_index
 
-# Display chat history
-for msg in messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# When a regen is actively streaming, split display around the streaming slot
+is_regen_streaming = (
+    st.session_state.pending_prompt is not None and
+    st.session_state.is_responding and
+    regen_idx is not None
+)
+split = regen_idx if is_regen_streaming else len(messages)
 
-# --- Chat input (disabled while responding) ---
-if prompt := st.chat_input(
-    "Type your message...",
-    disabled=st.session_state.is_responding
-):
-    st.session_state.threads[current_thread].append({"role": "user", "content": prompt})
-    st.session_state.pending_prompt = prompt
-    st.session_state.is_responding = True
-    st.rerun()  # Rerun immediately so input disables before streaming starts
+def render_message_block(msg_slice, index_offset=0):
+    for i, msg in enumerate(msg_slice, start=index_offset):
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+        if msg["role"] == "assistant":
+            user_msg = next(
+                (messages[j]["content"] for j in range(i - 1, -1, -1) if messages[j]["role"] == "user"),
+                None
+            )
+            if user_msg:
+                if st.button("↻ Regenerate", key=f"regen_{i}", disabled=st.session_state.is_responding):
+                    st.session_state.threads[current_thread] = messages[:i] + messages[i+1:]
+                    st.session_state.pending_prompt = user_msg
+                    st.session_state.regen_index = i
+                    st.session_state.is_responding = True
+                    st.rerun()
+
+# Messages before the streaming slot (or all messages when not regenerating)
+render_message_block(messages[:split])
 
 # --- Stream response for pending prompt ---
 if st.session_state.pending_prompt and st.session_state.is_responding:
@@ -89,7 +106,7 @@ if st.session_state.pending_prompt and st.session_state.is_responding:
 
     with st.chat_message("assistant"):
         status = st.empty()
-        status.caption("Thinking...")
+        status.caption("Regenerating..." if is_regen_streaming else "Thinking...")
 
         def token_stream():
             full = ""
@@ -136,19 +153,35 @@ if st.session_state.pending_prompt and st.session_state.is_responding:
             finally:
                 status.empty()
                 if full:
-                    st.session_state.threads[current_thread].append({"role": "assistant", "content": full})
-                # Always unlock, even if response was empty
+                    idx = st.session_state.regen_index
+                    if idx is not None:
+                        st.session_state.threads[current_thread].insert(idx, {"role": "assistant", "content": full})
+                        st.session_state.regen_index = None
+                    else:
+                        st.session_state.threads[current_thread].append({"role": "assistant", "content": full})
                 st.session_state.is_responding = False
 
-        # Outer safety net in case write_stream itself throws
         try:
             st.write_stream(token_stream())
         except Exception as e:
             status.empty()
             st.error(f"⚠️ Unexpected error: {e}")
         finally:
-            # Guaranteed unlock no matter what
             st.session_state.is_responding = False
             st.session_state.pending_prompt = None
 
+    st.rerun()
+
+# Messages after the streaming slot (only shown during regen streaming)
+if is_regen_streaming:
+    render_message_block(messages[split:], index_offset=split)
+
+# --- Chat input (disabled while responding) ---
+if prompt := st.chat_input(
+    "Type your message...",
+    disabled=st.session_state.is_responding
+):
+    st.session_state.threads[current_thread].append({"role": "user", "content": prompt})
+    st.session_state.pending_prompt = prompt
+    st.session_state.is_responding = True
     st.rerun()
