@@ -6,3 +6,8 @@ langchain_core
 langchain-cli[inmem]
 streamlit
 python-dotenv
+arxiv
+wikipedia
+requests
+langchain-tavily
+tavily-python
