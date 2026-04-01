@@ -1,0 +1,8 @@
+langchain
+langgraph
+langchain_community
+langchain_groq
+langchain_core
+langchain-cli[inmem]
+streamlit
+python-dotenv
