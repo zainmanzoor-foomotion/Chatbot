@@ -78,6 +78,7 @@ is_regen_streaming = (
 split = regen_idx if is_regen_streaming else len(messages)
 
 def render_message_block(msg_slice, index_offset=0):
+    import json as _json
     for i, msg in enumerate(msg_slice, start=index_offset):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -86,6 +87,33 @@ def render_message_block(msg_slice, index_offset=0):
                 (messages[j]["content"] for j in range(i - 1, -1, -1) if messages[j]["role"] == "user"),
                 None
             )
+            text_json = _json.dumps(msg["content"])
+            st.components.v1.html(f"""
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button id="copy_{i}" style="display:flex;align-items:center;gap:5px;background:none;border:1px solid #444;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;color:#ccc;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                </button>
+            </div>
+            <script>
+                var btn = document.getElementById("copy_{i}");
+                var txt = {text_json};
+                btn.addEventListener("click", function() {{
+                    navigator.clipboard.writeText(txt).then(function() {{
+                        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+                        btn.style.color = "#4caf50";
+                        btn.style.borderColor = "#4caf50";
+                        setTimeout(function() {{
+                            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+                            btn.style.color = "#ccc";
+                            btn.style.borderColor = "#444";
+                        }}, 2000);
+                    }});
+                }});
+            </script>
+            """, height=40)
             if user_msg:
                 if st.button("↻ Regenerate", key=f"regen_{i}", disabled=st.session_state.is_responding):
                     st.session_state.threads[current_thread] = messages[:i] + messages[i+1:]
