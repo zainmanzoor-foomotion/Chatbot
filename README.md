@@ -62,13 +62,31 @@ LangGraph StateGraph
     ├── START
     │     │
     │     ▼
-    │  [chatbot node]  ←── SystemMessage + conversation history
-    │     │  invokes Groq LLaMA 3.3 70B
+    │  [ModelTool node]  ←── SystemMessage + conversation history
+    │     │  invokes Groq LLaMA 3.3 70B with tools bound
     │     ▼
-    └── END
-         │
-         ▼
-  Streamed tokens → Streamlit chat UI
+    │  ┌─────────────────────────────────────┐
+    │  │        Conditional Routing           │
+    │  │  tools_condition() checks if LLM     │
+    │  │  made any tool calls                  │
+    │  └─────────────────────────────────────┘
+    │     │                    │
+    │     ▼                    ▼
+    │  [tools node]          END
+    │     │  ToolNode executes    │  Streamed tokens
+    │     │  the called tools     │  → Streamlit chat UI
+    │     │  (ArXiv, Wikipedia,   │
+    │     │  Weather, Crypto,     │
+    │     │  Tavily Search)       │
+    │     ▼                    │
+    │  ──────────────────────── │
+    │     │ (loop back)         │
+    │     ▼                    │
+    │  [ModelTool node] ◄─────── │
+    │     │  processes tool      │
+    │     │  results & responds  │
+    │     ▼                    │
+    └────────────────────────────┘
 ```
 
 Each conversation thread gets its own `thread_id` used as the LangGraph config key, so memory is fully isolated between sessions.
