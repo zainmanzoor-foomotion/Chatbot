@@ -141,7 +141,7 @@ export default function ChatInput({ onSend, disabled, model, onModelChange }: Pr
             disabled={disabled}
             placeholder="Type your message... (Shift+Enter for new line, Alt+Up/Down to move line)"
             rows={1}
-            className="flex-1 bg-transparent text-sm text-white placeholder-[#6b7280] resize-none outline-none leading-6 max-h-[200px] disabled:opacity-50"
+            className="flex-1 bg-transparent pt-1 text-sm text-white placeholder-[#6b7280] resize-none outline-none leading-6 max-h-[200px] disabled:opacity-50"
           />
 
           {/* Custom model dropdown — opens upward */}
