@@ -24,9 +24,7 @@ A conversational AI chatbot built with **React + Vite**, **FastAPI**, **LangGrap
 | Frontend | React 18, Vite, Tailwind CSS |
 | Backend | FastAPI, Uvicorn |
 | LLM | Groq (Multiple Models Available) |
-| Available Models | • GPT OSS 20B (`openai/gpt-oss-20b`) 
-• Qwen3 32B (`qwen/qwen3-32b`) 
-• LLama 3.3 70B (`llama-3.3-70b-versatile`) |
+| Available Models | GPT OSS 20B (`openai/gpt-oss-20b`)<br/>Qwen3 32B (`qwen/qwen3-32b`)<br/>LLama 3.3 70B (`llama-3.3-70b-versatile`) |
 | Orchestration | LangGraph (`StateGraph`) |
 | LLM Abstraction | LangChain Core / LangChain Groq |
 | Memory | LangGraph `MemorySaver` (in-memory) |
@@ -34,7 +32,6 @@ A conversational AI chatbot built with **React + Vite**, **FastAPI**, **LangGrap
 | Tools | LangChain Community (ArXiv, Wikipedia), Custom (Weather, Crypto), Tavily Search |
 | Streaming | Server-Sent Events (SSE) via `StreamingResponse` |
 | Config | python-dotenv |
-
 ## Project Structure
 
 ```
