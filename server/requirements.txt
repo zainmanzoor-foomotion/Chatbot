@@ -12,3 +12,4 @@ wikipedia
 requests
 langchain-tavily
 tavily-python
+Pillow

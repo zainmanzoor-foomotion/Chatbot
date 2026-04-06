@@ -128,6 +128,12 @@ async def chat(req: ChatRequest):
                     if tool_name not in tools_used:
                         tools_used.append(tool_name)
                     yield f"data: {json.dumps({'type': 'tool', 'tools': tools_used})}\n\n"
+                    # Emit image data if this is the image generation tool
+                    if tool_name == "generate_image":
+                        content = chunk.content or ""
+                        if content.startswith("IMAGE_BASE64:"):
+                            b64_data = content[len("IMAGE_BASE64:"):]
+                            yield f"data: {json.dumps({'type': 'image', 'data': b64_data})}\n\n"
                     continue
 
                 has_tool_calls = bool(getattr(chunk, "tool_calls", [])) or \

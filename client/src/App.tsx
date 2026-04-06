@@ -93,7 +93,15 @@ export default function App() {
             setThreads(prev => {
               const msgs = [...(prev[threadId] || [])]
               const idx = assistantIdxRef.current < msgs.length ? assistantIdxRef.current : msgs.length - 1
-              msgs[idx] = { role: 'assistant', content: snapshot }
+              msgs[idx] = { ...msgs[idx], role: 'assistant', content: snapshot }
+              return { ...prev, [threadId]: msgs }
+            })
+          } else if (data.type === 'image') {
+            const imageUrl = `data:image/png;base64,${data.data}`
+            setThreads(prev => {
+              const msgs = [...(prev[threadId] || [])]
+              const idx = assistantIdxRef.current < msgs.length ? assistantIdxRef.current : msgs.length - 1
+              msgs[idx] = { ...msgs[idx], imageUrl }
               return { ...prev, [threadId]: msgs }
             })
           } else if (data.type === 'tool') {
@@ -103,7 +111,7 @@ export default function App() {
             setThreads(prev => {
               const msgs = [...(prev[threadId] || [])]
               const idx = assistantIdxRef.current < msgs.length ? assistantIdxRef.current : msgs.length - 1
-              msgs[idx] = { role: 'assistant', content: data.content }
+              msgs[idx] = { ...msgs[idx], role: 'assistant', content: data.content }
               return { ...prev, [threadId]: msgs }
             })
             if (data.new_thread_id) {

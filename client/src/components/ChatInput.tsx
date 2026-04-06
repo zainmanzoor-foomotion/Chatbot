@@ -42,10 +42,83 @@ export default function ChatInput({ onSend, disabled, model, onModelChange }: Pr
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    // Alt+Up/Down to move lines (like VS Code)
+    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault()
+      moveLine(e.key === 'ArrowUp' ? 'up' : 'down')
+      return
+    }
+
+    // Enter to send
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
+  }
+
+  function moveLine(direction: 'up' | 'down') {
+    const el = textareaRef.current
+    if (!el) return
+
+    const text = el.value
+    const cursorPos = el.selectionStart
+    
+    // Find the current line start and end
+    let lineStart = text.lastIndexOf('\n', cursorPos - 1) + 1
+    let lineEnd = text.indexOf('\n', cursorPos)
+    if (lineEnd === -1) lineEnd = text.length
+
+    // Get current line
+    const currentLine = text.substring(lineStart, lineEnd)
+    
+    if (direction === 'up') {
+      // Check if there's a line above
+      if (lineStart === 0) return
+      
+      const prevLineStart = text.lastIndexOf('\n', lineStart - 2) + 1
+      const prevLine = text.substring(prevLineStart, lineStart - 1)
+      
+      // Swap lines
+      const newText = 
+        text.substring(0, prevLineStart) +
+        currentLine + '\n' +
+        prevLine +
+        text.substring(lineEnd)
+      
+      el.value = newText
+      setValue(newText)
+      
+      // Move cursor to same position in the line above
+      const newCursorPos = prevLineStart + (cursorPos - lineStart)
+      el.selectionStart = el.selectionEnd = newCursorPos
+    } else {
+      // direction === 'down'
+      // Check if there's a line below
+      if (lineEnd === text.length) return
+      
+      const nextLineStart = lineEnd + 1
+      const nextLineEnd = text.indexOf('\n', nextLineStart)
+      const nextLine = nextLineEnd === -1 
+        ? text.substring(nextLineStart)
+        : text.substring(nextLineStart, nextLineEnd)
+      
+      // Swap lines
+      const newText = 
+        text.substring(0, lineStart) +
+        nextLine + '\n' +
+        currentLine +
+        text.substring(nextLineEnd === -1 ? text.length : nextLineEnd)
+      
+      el.value = newText
+      setValue(newText)
+      
+      // Move cursor to same position in the line below
+      const newCursorPos = lineStart + nextLine.length + 1 + (cursorPos - lineStart)
+      el.selectionStart = el.selectionEnd = newCursorPos
+    }
+
+    // Update height after text change
+    el.dispatchEvent(new Event('input', { bubbles: true }))
   }
 
   function handleInput() {
@@ -58,7 +131,7 @@ export default function ChatInput({ onSend, disabled, model, onModelChange }: Pr
   return (
     <div className="p-4">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-2 bg-[#2f2f2f] rounded-2xl px-4 py-3 border border-[#3a3a3a] focus-within:border-[#555]">
+        <div className="flex item module s-center gap-2 bg-[#2f2f2f] rounded-2xl px-4 py-3 border border-[#3a3a3a] focus-within:border-[#555]">
           <textarea
             ref={textareaRef}
             value={value}
@@ -66,7 +139,7 @@ export default function ChatInput({ onSend, disabled, model, onModelChange }: Pr
             onKeyDown={handleKeyDown}
             onInput={handleInput}
             disabled={disabled}
-            placeholder="Type your message... (Shift+Enter for new line)"
+            placeholder="Type your message... (Shift+Enter for new line, Alt+Up/Down to move line)"
             rows={1}
             className="flex-1 bg-transparent text-sm text-white placeholder-[#6b7280] resize-none outline-none leading-6 max-h-[200px] disabled:opacity-50"
           />

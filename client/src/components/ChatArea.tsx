@@ -52,38 +52,23 @@ export default function ChatArea({ messages, isResponding, isRegenerating, toolS
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto py-6">
       <div className="max-w-3xl mx-auto px-4">
-        {messages.map((msg, i) => {
-          // Skip empty assistant placeholder — "Thinking/Regenerating" indicator covers this state
-          if (msg.role === 'assistant' && msg.content === '' && i === streamingIndex) return null
-          return (
-            <MessageBubble
-              key={i}
-              message={msg}
-              index={i}
-              isResponding={isResponding}
-              isStreaming={i === streamingIndex}
-              onRegenerate={onRegenerate}
-            />
-          )
-        })}
+        {messages.map((msg, i) => (
+          <MessageBubble
+            key={i}
+            message={msg}
+            index={i}
+            isResponding={isResponding}
+            isStreaming={i === streamingIndex}
+            isRegenerating={isRegenerating}
+            onRegenerate={onRegenerate}
+          />
+        ))}
 
         {/* Tool status */}
         {toolStatus && (
           <div className="flex items-center gap-2 text-xs text-[#6b7280] mb-4 ml-10">
             <span className="w-1.5 h-1.5 rounded-full bg-[#10a37f] animate-pulse" />
             {toolStatus}
-          </div>
-        )}
-
-        {/* Thinking / Regenerating indicator */}
-        {isResponding && streamingIndex !== null && messages[streamingIndex]?.content === '' && !toolStatus && (
-          <div className="flex items-center gap-3 mb-4">
-            <div className="shrink-0 w-7 h-7 rounded-full bg-[#10a37f] flex items-center justify-center text-white text-xs font-bold">
-              AI
-            </div>
-            <span className="text-xs text-[#6b7280] animate-pulse">
-              {isRegenerating ? 'Regenerating...' : 'Thinking...'}
-            </span>
           </div>
         )}
       </div>

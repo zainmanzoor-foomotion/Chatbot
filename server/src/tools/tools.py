@@ -1,5 +1,8 @@
 import os
+import io
+import base64
 import requests
+from PIL import Image
 from dotenv import load_dotenv
 from langchain_community.tools import ArxivQueryRun, WikipediaQueryRun
 from langchain_community.utilities import WikipediaAPIWrapper, ArxivAPIWrapper
@@ -149,4 +152,29 @@ def get_crypto_price(crypto_id: str) -> str:
         return f"Failed to fetch crypto price: {str(e)}"
 
 
-tools = [arxiv_tool, wiki_tool, get_weather, tavily_tool, get_crypto_price]
+# --- Image Generation Tool ---
+@tool
+def generate_image(prompt: str) -> str:
+    """Generate an image from a text description using AI.
+    Use this when the user asks to create, draw, generate, or make an image/picture/photo."""
+    import urllib.parse
+    try:
+        encoded = urllib.parse.quote(prompt)
+        url = f"https://image.pollinations.ai/prompt/{encoded}?width=512&height=512&nologo=true&enhance=false"
+        response = requests.get(url, timeout=120)
+        if response.status_code != 200:
+            return f"IMAGE_ERROR: Service returned status {response.status_code}"
+
+        # Resize to 256×256 and compress as JPEG quality=25
+        # keeps base64 under ~5 KB (~1,200 tokens) so it never blows Groq's token limit
+        img = Image.open(io.BytesIO(response.content)).convert("RGB")
+        img = img.resize((256, 256), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=25, optimize=True)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return f"IMAGE_BASE64:{b64}"
+    except Exception as e:
+        return f"IMAGE_ERROR: {str(e)}"
+
+
+tools = [arxiv_tool, wiki_tool, get_weather, tavily_tool, get_crypto_price, generate_image]
