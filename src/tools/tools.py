@@ -62,17 +62,62 @@ def get_weather(city: str) -> str:
 
 
 # --- Crypto Price Tool ---
+_NOISE_WORDS = {"coin", "token", "crypto", "price", "network", "protocol"}
+
+def _format_price(price) -> str:
+    """Format a crypto price with appropriate decimal places and $ symbol."""
+    if price == "N/A":
+        return "$N/A"
+    if price >= 1:
+        return f"${price:,.2f}"
+    elif price >= 0.01:
+        return f"${price:,.4f}"
+    elif price >= 0.0001:
+        return f"${price:,.6f}"
+    else:
+        return f"${price:,.8f}"
+
+def _resolve_crypto_id(query: str) -> str | None:
+    """Search CoinGecko for the best matching coin ID for a given name/symbol.
+    Tries progressively simplified versions of the query to improve matching."""
+    search_url = "https://api.coingecko.com/api/v3/search"
+
+    # Build candidate queries: stripped first (cleaner match), then original, then first word
+    words = query.lower().split()
+    stripped = " ".join(w for w in words if w not in _NOISE_WORDS)
+    candidates = dict.fromkeys(filter(None, [stripped, query.lower(), words[0] if words else None]))
+
+    for candidate in candidates:
+        try:
+            resp = requests.get(search_url, params={"query": candidate}, timeout=10)
+            if resp.status_code == 200:
+                coins = resp.json().get("coins", [])
+                if coins:
+                    return coins[0]["id"]
+        except requests.exceptions.RequestException:
+            pass
+    return None
+
+
 @tool
 def get_crypto_price(crypto_id: str) -> str:
-    """Get the current price and market data for a cryptocurrency. 
-    Use common crypto IDs like 'bitcoin', 'ethereum', 'cardano', 'solana', 'dogecoin', etc.
+    """Get the current price and market data for a cryptocurrency.
+    Pass any coin name or symbol (e.g. 'pi', 'pi coin', 'pi network', 'bitcoin', 'eth').
+    The tool will automatically resolve the correct CoinGecko ID if needed.
     Returns price in USD, 24h change, market cap, and other key metrics."""
-    
+
     # CoinGecko API is free for basic usage
     url = f"https://api.coingecko.com/api/v3/coins/{crypto_id}"
-    
+
     try:
         response = requests.get(url, timeout=10)
+        if response.status_code == 404:
+            resolved = _resolve_crypto_id(crypto_id)
+            if resolved and resolved != crypto_id:
+                url = f"https://api.coingecko.com/api/v3/coins/{resolved}"
+                response = requests.get(url, timeout=10)
+            if response.status_code == 404:
+                return f"Cryptocurrency '{crypto_id}' not found on CoinGecko. It may not be listed yet."
         if response.status_code == 200:
             data = response.json()
             
@@ -88,7 +133,7 @@ def get_crypto_price(crypto_id: str) -> str:
             
             # Format the response
             result = f"📊 {name} ({symbol})\n"
-            result += f"💰 Price: ${current_price:,.2f}\n" if current_price != "N/A" else f"💰 Price: {current_price}\n"
+            result += f"💰 Price: {_format_price(current_price)}\n"
             result += f"📈 24h Change: {price_change_24h:+.2f}%\n" if price_change_24h != "N/A" else f"📈 24h Change: {price_change_24h}\n"
             result += f"💎 Market Cap: ${market_cap:,.0f}\n" if market_cap != "N/A" else f"💎 Market Cap: {market_cap}\n"
             result += f"🏆 Market Cap Rank: #{market_cap_rank}\n" if market_cap_rank != "N/A" else f"🏆 Market Cap Rank: {market_cap_rank}\n"
@@ -96,8 +141,6 @@ def get_crypto_price(crypto_id: str) -> str:
             result += f"🪙 Circulating Supply: {circulating_supply:,.0f} {symbol}\n" if circulating_supply != "N/A" else f"🪙 Circulating Supply: {circulating_supply}\n"
             
             return result
-        elif response.status_code == 404:
-            return f"Cryptocurrency '{crypto_id}' not found. Try common IDs like 'bitcoin', 'ethereum', 'cardano', 'solana', 'dogecoin', etc."
         else:
             return f"Crypto API error (status {response.status_code}). Please try again later."
     except requests.exceptions.Timeout:
