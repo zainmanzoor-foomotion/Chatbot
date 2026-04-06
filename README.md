@@ -1,6 +1,6 @@
 # AI Chatbot
 
-A conversational AI chatbot built with **React + Vite**, **FastAPI**, **LangGraph**, and **Groq** (Qwen3 32B). Supports multiple concurrent chat sessions with full conversation memory per thread and real-time streaming responses.
+A conversational AI chatbot built with **React + Vite**, **FastAPI**, **LangGraph**, and **Groq API**. Supports multiple concurrent chat sessions with full conversation memory per thread and real-time streaming responses.
 
 ## Features
 
@@ -24,10 +24,7 @@ A conversational AI chatbot built with **React + Vite**, **FastAPI**, **LangGrap
 | Frontend | React 18, Vite, Tailwind CSS |
 | Backend | FastAPI, Uvicorn |
 | LLM | Groq (Multiple Models Available) |
-| Available Models | 
-• GPT OSS 20B (`openai/gpt-oss-20b`)
-• Qwen3 32B (`qwen/qwen3-32b`) 
-• LLama 3.3 70B (`llama-3.3-70b-versatile`) |
+| Available Models | • GPT OSS 20B (`openai/gpt-oss-20b`) • Qwen3 32B (`qwen/qwen3-32b`) • LLama 3.3 70B (`llama-3.3-70b-versatile`) |
 | Orchestration | LangGraph (`StateGraph`) |
 | LLM Abstraction | LangChain Core / LangChain Groq |
 | Memory | LangGraph `MemorySaver` (in-memory) |
@@ -92,7 +89,7 @@ LangGraph StateGraph
     │  tools_condition()
     │     │                    │
     │     ▼                    ▼
-    │  [tools node]           END
+    │  [tooSupportsls node]           END
     │     │  ArXiv / Wikipedia /
     │     │  Weather / Crypto /
     │     │  Tavily Search
