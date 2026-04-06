@@ -1,5 +1,5 @@
 from langchain_core.messages import SystemMessage
-from src.states.blog_state import ChatState
+from src.states.state import ChatState
 
 SYSTEM_PROMPT = """You are a professional AI assistant with access to the following tools:
 - arxiv: Search academic papers and research.

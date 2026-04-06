@@ -4,7 +4,8 @@ langchain_community
 langchain_groq
 langchain_core
 langchain-cli[inmem]
-streamlit
+fastapi
+uvicorn[standard]
 python-dotenv
 arxiv
 wikipedia

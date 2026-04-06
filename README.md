@@ -1,177 +1,178 @@
 # AI Chatbot
 
-A conversational AI chatbot built with **Streamlit**, **LangGraph**, and **Groq** (LLaMA 3.3 70B). Supports multiple concurrent chat sessions with full conversation memory per thread.
+A conversational AI chatbot built with **React + Vite**, **FastAPI**, **LangGraph**, and **Groq** (Qwen3 32B). Supports multiple concurrent chat sessions with full conversation memory per thread and real-time streaming responses.
 
 ## Features
 
 - Multi-session chat — create and switch between independent conversations from the sidebar
-- Streaming responses — tokens stream in real time as the model generates them
+- Streaming responses — tokens stream in real time via Server-Sent Events (SSE)
 - Persistent memory per thread — each chat thread retains its full history using LangGraph's `MemorySaver`
-- Professional system prompt — the assistant is instructed to be clear, concise, and honest
+- Regenerate — re-run any assistant response with one click
+- Copy — copy any assistant message to clipboard
 - LangSmith tracing support — optional observability via `LANGSMITH_API_KEY`
-- **Integrated Tools** — AI assistant has access to multiple tools for enhanced capabilities:
+- **Integrated Tools** — AI assistant has access to multiple tools:
   - **ArXiv Search** — Search academic papers and research
-  - **Wikipedia Lookup** — Access encyclopedic information and explanations
-  - **Real-time Weather** — Get current weather data for any city worldwide
-  - **Crypto Prices** — Real-time cryptocurrency prices and market data (Bitcoin, Ethereum, etc.)
+  - **Wikipedia Lookup** — Access encyclopedic information
+  - **Real-time Weather** — Current weather data for any city worldwide
+  - **Crypto Prices** — Real-time cryptocurrency prices and market data via CoinGecko
   - **Web Search** — Powered by Tavily for current news and web content
 
 ## Tech Stack
 
-| Layer | Library |
+| Layer | Library / Tool |
 |---|---|
-| UI | Streamlit |
-| LLM | Groq (`llama-3.3-70b-versatile`) |
+| Frontend | React 18, Vite, Tailwind CSS |
+| Backend | FastAPI, Uvicorn |
+| LLM | Groq (Multiple Models Available) |
+| Available Models | 
+• GPT OSS 20B (`openai/gpt-oss-20b`)
+• Qwen3 32B (`qwen/qwen3-32b`) 
+• LLama 3.3 70B (`llama-3.3-70b-versatile`) |
 | Orchestration | LangGraph (`StateGraph`) |
 | LLM Abstraction | LangChain Core / LangChain Groq |
 | Memory | LangGraph `MemorySaver` (in-memory) |
+| Tool Input Validation | Pydantic `args_schema` |
 | Tools | LangChain Community (ArXiv, Wikipedia), Custom (Weather, Crypto), Tavily Search |
+| Streaming | Server-Sent Events (SSE) via `StreamingResponse` |
 | Config | python-dotenv |
 
 ## Project Structure
 
 ```
 Chatbot/
-├── app.py                  # Streamlit UI entry point
-├── requirements.txt        # Python dependencies
-├── pyproject.toml          # Project metadata
-└── src/
-    ├── graphs/
-    │   └── graph_builder.py    # Builds the LangGraph StateGraph
-    ├── llms/
-    │   └── groqllm.py          # Groq LLM initialization
-    ├── nodes/
-    │   └── blog_node.py        # ChatNode with system prompt and tool logic
-    ├── states/
-    │   └── blog_state.py       # ChatState TypedDict definition
-    └── tools/
-        └── tools.py            # Integrated tools (ArXiv, Wikipedia, Weather, Crypto, Tavily)
+├── server/                         # Python backend (FastAPI + LangGraph)
+│   ├── app.py                      # FastAPI entry point + SSE streaming
+│   ├── requirements.txt            # Python dependencies
+│   ├── pyproject.toml              # Project metadata
+│   ├── .env                        # Environment variables
+│   └── src/
+│       ├── graphs/
+│       │   └── graph_builder.py    # Builds the LangGraph StateGraph
+│       ├── llms/
+│       │   └── groqllm.py          # Groq LLM initialization
+│       ├── nodes/
+│       │   └── node.py             # ChatNode — system prompt + tool binding
+│       ├── states/
+│       │   └── state.py            # ChatState TypedDict definition
+│       └── tools/
+│           └── tools.py            # Tools with Pydantic input/output schemas
+│
+└── client/                         # React frontend (Vite + Tailwind)
+    ├── index.html
+    ├── vite.config.ts              # Vite config with /api proxy
+    ├── tailwind.config.js
+    └── src/
+        ├── main.tsx
+        ├── App.tsx                 # Global state, streaming logic
+        ├── types.ts
+        └── components/
+            ├── Sidebar.tsx         # Thread list + New Chat
+            ├── ChatArea.tsx        # Message list + thinking indicator
+            ├── MessageBubble.tsx   # User/assistant message + copy + regenerate
+            └── ChatInput.tsx       # Textarea input + send button
 ```
 
 ## Architecture
 
 ```
-User Input
+User Input (React)
     │
-    ▼
-Streamlit UI (app.py)
-    │  sends HumanMessage
+    ▼  POST /api/chat  (JSON)
+FastAPI  app.py
+    │  runs graph.stream() in a background thread
+    │  emits SSE events: token | tool | error | done
     ▼
 LangGraph StateGraph
     │
     ├── START
-    │     │
     │     ▼
-    │  [ModelTool node]  ←── SystemMessage + conversation history
-    │     │  invokes Groq LLaMA 3.3 70B with tools bound
+    │  [ModelTool node]  ←── SystemPrompt + conversation history
+    │     │  Groq Qwen3 32B with tools bound
     │     ▼
-    │  ┌─────────────────────────────────────┐
-    │  │        Conditional Routing           │
-    │  │  tools_condition() checks if LLM     │
-    │  │  made any tool calls                  │
-    │  └─────────────────────────────────────┘
+    │  tools_condition()
     │     │                    │
     │     ▼                    ▼
-    │  [tools node]          END
-    │     │  ToolNode executes    │  Streamed tokens
-    │     │  the called tools     │  → Streamlit chat UI
-    │     │  (ArXiv, Wikipedia,   │
-    │     │  Weather, Crypto,     │
-    │     │  Tavily Search)       │
-    │     ▼                    │
-    │  ──────────────────────── │
-    │     │ (loop back)         │
-    │     ▼                    │
-    │  [ModelTool node] ◄─────── │
-    │     │  processes tool      │
-    │     │  results & responds  │
-    │     ▼                    │
-    └────────────────────────────┘
+    │  [tools node]           END
+    │     │  ArXiv / Wikipedia /
+    │     │  Weather / Crypto /
+    │     │  Tavily Search
+    │     ▼
+    │  [ModelTool node]  (loop — processes tool results)
+    │     ▼
+    └── END
+         │
+         ▼  SSE token stream
+React ChatArea (renders markdown in real time)
 ```
-
-Each conversation thread gets its own `thread_id` used as the LangGraph config key, so memory is fully isolated between sessions.
 
 ## Setup
 
 ### Prerequisites
 
 - Python 3.11+
+- Node.js 18+
 - A [Groq](https://console.groq.com/) API key
 - (Optional) A [LangSmith](https://smith.langchain.com/) API key for tracing
-- (Optional) An [OpenWeather](https://openweathermap.org/api) API key for weather functionality
-- (Optional) A [Tavily](https://tavily.com/) API key for enhanced web search
+- (Optional) An [OpenWeather](https://openweathermap.org/api) API key for weather
+- (Optional) A [Tavily](https://tavily.com/) API key for web search
 
-### Installation
+### 1 — Backend
 
 ```bash
-# Clone the repo or navigate to the project directory
-cd Chatbot
+cd Chatbot/server
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### Environment Variables
-
-Create a `.env` file in the project root:
+Create `server/.env`:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
-LANGSMITH_API_KEY=your_langsmith_api_key_here   # optional
-OPENWEATHER_API_KEY=your_openweather_api_key_here   # optional, for weather
-TAVILY_API_KEY=your_tavily_api_key_here   # optional, for enhanced web search
+LANGSMITH_API_KEY=your_langsmith_api_key_here     # optional
+OPENWEATHER_API_KEY=your_openweather_api_key_here # optional
+TAVILY_API_KEY=your_tavily_api_key_here           # optional
 ```
 
-### Run
+Start the server:
 
 ```bash
-streamlit run app.py
+python -m uvicorn app:app --reload --port 8000
 ```
 
-The app will open at `http://localhost:8501` by default.
+### 2 — Frontend
+
+```bash
+cd Chatbot/client
+
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`.
 
 ## Usage
 
-1. Type a message in the chat input at the bottom and press Enter.
+1. Type a message and press **Enter** (or click the send button).
 2. The assistant responds with streamed output in real time.
 3. Click **+ New Chat** in the sidebar to start a fresh conversation.
-4. Previous chats are listed in the sidebar — click any to switch back to it.
+4. Previous chats are listed in the sidebar — click any to switch.
+5. Click **↻ Regenerate** below any assistant message to get a new response.
+6. Click **Copy** to copy any assistant message to clipboard.
 
 ### Tool Usage Examples
 
-The AI assistant can help you with various tasks using its integrated tools:
-
-- **Academic Research**: "Search for papers about machine learning transformers"
-- **General Knowledge**: "Tell me about quantum computing"
-- **Weather**: "What's the weather like in Tokyo right now?"
-- **Cryptocurrency**: "What's the current price of Bitcoin?" or "Show me Ethereum market data"
-- **Web Search**: "What are the latest developments in AI this week?"
-
-The assistant automatically determines which tool to use based on your request.
-
-## Dependencies
-
-```
-langchain
-langgraph
-langchain_community
-langchain_core
-langchain_groq
-langchain-cli[inmem]
-streamlit
-python-dotenv
-arxiv
-wikipedia
-requests
-langchain-tavily
-tavily-python
-```
+| Query | Tool Used |
+|---|---|
+| "Search for papers about transformer models" | ArXiv |
+| "Tell me about the Roman Empire" | Wikipedia |
+| "What's the weather in Tokyo?" | OpenWeather |
+| "Price of Bitcoin / Pi coin / Ethereum" | CoinGecko |
+| "Latest AI news this week" | Tavily Search |
 
 ## Notes
 
-- Conversation memory is in-process only. Restarting the Streamlit app clears all chat history.
-- To persist history across restarts, replace `MemorySaver` in [graph_builder.py](src/graphs/graph_builder.py) with a database-backed checkpointer (e.g., `langgraph-checkpoint-sqlite`).
-- **Crypto prices** are fetched from CoinGecko API (free tier, no authentication required).
-- **Weather data** requires an OpenWeather API key for full functionality.
-- **Web search** works best with a Tavily API key for comprehensive results.
-- Tools are automatically selected based on user queries - no manual tool selection needed.
+- Conversation memory is in-process only — restarting the server clears all chat history.
+- To persist history, replace `MemorySaver` in [server/src/graphs/graph_builder.py](server/src/graphs/graph_builder.py) with a database-backed checkpointer with a database-backed checkpointer (e.g. `langgraph-checkpoint-sqlite`).
+- Crypto prices use CoinGecko's free API — no key required. Ambiguous coin names (e.g. "pi coin") are resolved automatically via CoinGecko's search endpoint.
+- The Vite dev server proxies all `/api/*` requests to `http://localhost:8000`, so no CORS issues during development.

@@ -1,8 +1,8 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
-from src.states.blog_state import ChatState
-from src.nodes.blog_node import ChatNode
+from src.states.state import ChatState
+from src.nodes.node import ChatNode
 from src.tools.tools import tools
 
 
