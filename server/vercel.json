@@ -1,18 +1,8 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "server/app.py",
-      "use": "@vercel/python"
+  "buildCommand": "pip install -r requirements.txt",
+  "functions": {
+    "server/app.py": {
+      "runtime": "python3.12"
     }
-  ],
-  "routes": [
-    {
-      "src": "server/app.py",
-      "dest": "server/app.py"
-    }
-  ],
-  "env": {
-    "PYTHON_VERSION": "3.12"
   }
 }
