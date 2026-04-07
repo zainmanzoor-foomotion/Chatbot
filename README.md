@@ -7,6 +7,7 @@ A conversational AI chatbot built with **React + Vite**, **FastAPI**, **LangGrap
 - Multi-session chat — create and switch between independent conversations from the sidebar
 - Streaming responses — tokens stream in real time via Server-Sent Events (SSE)
 - Persistent memory per thread — each chat thread retains its full history using LangGraph's `MemorySaver`
+- Model selector — switch between available Groq models from the chat input dropdown
 - Regenerate — re-run any assistant response with one click
 - Copy — copy any assistant message to clipboard
 - LangSmith tracing support — optional observability via `LANGSMITH_API_KEY`
@@ -16,6 +17,7 @@ A conversational AI chatbot built with **React + Vite**, **FastAPI**, **LangGrap
   - **Real-time Weather** — Current weather data for any city worldwide
   - **Crypto Prices** — Real-time cryptocurrency prices and market data via CoinGecko
   - **Web Search** — Powered by Tavily for current news and web content
+  - **Image Generation** — Generate images from text descriptions via Pollinations AI (free, no API key required)
 
 ## Tech Stack
 
@@ -29,9 +31,11 @@ A conversational AI chatbot built with **React + Vite**, **FastAPI**, **LangGrap
 | LLM Abstraction | LangChain Core / LangChain Groq |
 | Memory | LangGraph `MemorySaver` (in-memory) |
 | Tool Input Validation | Pydantic `args_schema` |
-| Tools | LangChain Community (ArXiv, Wikipedia), Custom (Weather, Crypto), Tavily Search |
+| Tools | LangChain Community (ArXiv, Wikipedia), Custom (Weather, Crypto, Image Gen), Tavily Search |
+| Image Generation | Pollinations AI (free, no key required), Pillow for image processing |
 | Streaming | Server-Sent Events (SSE) via `StreamingResponse` |
 | Config | python-dotenv |
+
 ## Project Structure
 
 ```
@@ -65,7 +69,7 @@ Chatbot/
             ├── Sidebar.tsx         # Thread list + New Chat
             ├── ChatArea.tsx        # Message list + thinking indicator
             ├── MessageBubble.tsx   # User/assistant message + copy + regenerate
-            └── ChatInput.tsx       # Textarea input + send button
+            └── ChatInput.tsx       # Textarea input + model selector + send button
 ```
 
 ## Architecture
@@ -76,29 +80,30 @@ User Input (React)
     ▼  POST /api/chat  (JSON)
 FastAPI  app.py
     │  runs graph.stream() in a background thread
-    │  emits SSE events: token | tool | error | done
+    │  emits SSE events: token | image | tool | error | done
     ▼
 LangGraph StateGraph
     │
     ├── START
     │     ▼
     │  [ModelTool node]  ←── SystemPrompt + conversation history
-    │     │  Groq Qwen3 32B with tools bound
+    │     │  Groq LLM with tools bound
     │     ▼
     │  tools_condition()
     │     │                    │
     │     ▼                    ▼
-    │  [tooSupportsls node]           END
+    │  [tools node]           END
     │     │  ArXiv / Wikipedia /
     │     │  Weather / Crypto /
-    │     │  Tavily Search
+    │     │  Tavily Search /
+    │     │  Image Generation
     │     ▼
     │  [ModelTool node]  (loop — processes tool results)
     │     ▼
     └── END
          │
-         ▼  SSE token stream
-React ChatArea (renders markdown in real time)
+         ▼  SSE token/image stream
+React ChatArea (renders markdown + images in real time)
 ```
 
 ## Setup
@@ -145,16 +150,24 @@ npm install
 npm run dev
 ```
 
+Optionally create `client/.env` to point at a different backend:
+
+```env
+VITE_API_URL=http://localhost:8000
+```
+
 Open `http://localhost:5173`.
 
 ## Usage
 
-1. Type a message and press **Enter** (or click the send button).
-2. The assistant responds with streamed output in real time.
-3. Click **+ New Chat** in the sidebar to start a fresh conversation.
-4. Previous chats are listed in the sidebar — click any to switch.
-5. Click **↻ Regenerate** below any assistant message to get a new response.
-6. Click **Copy** to copy any assistant message to clipboard.
+1. Type a message and press **Enter** (or click the send button). Use **Shift+Enter** for a new line.
+2. Use **Alt+Up / Alt+Down** to move lines in the input, like VS Code.
+3. The assistant responds with streamed output in real time.
+4. Click the model selector in the input bar to switch between available Groq models.
+5. Click **+ New Chat** in the sidebar to start a fresh conversation.
+6. Previous chats are listed in the sidebar — click any to switch.
+7. Click **↻ Regenerate** below any assistant message to get a new response.
+8. Click **Copy** to copy any assistant message to clipboard.
 
 ### Tool Usage Examples
 
@@ -165,10 +178,12 @@ Open `http://localhost:5173`.
 | "What's the weather in Tokyo?" | OpenWeather |
 | "Price of Bitcoin / Pi coin / Ethereum" | CoinGecko |
 | "Latest AI news this week" | Tavily Search |
+| "Generate an image of a sunset over mountains" | Pollinations AI |
 
 ## Notes
 
 - Conversation memory is in-process only — restarting the server clears all chat history.
-- To persist history, replace `MemorySaver` in [server/src/graphs/graph_builder.py](server/src/graphs/graph_builder.py) with a database-backed checkpointer with a database-backed checkpointer (e.g. `langgraph-checkpoint-sqlite`).
+- To persist history, replace `MemorySaver` in [server/src/graphs/graph_builder.py](server/src/graphs/graph_builder.py) with a database-backed checkpointer (e.g. `langgraph-checkpoint-sqlite`).
 - Crypto prices use CoinGecko's free API — no key required. Ambiguous coin names (e.g. "pi coin") are resolved automatically via CoinGecko's search endpoint.
+- Image generation uses Pollinations AI's free API — no key required. Generated images are resized and compressed before streaming to stay within Groq's token limits.
 - The Vite dev server proxies all `/api/*` requests to `http://localhost:8000`, so no CORS issues during development.
