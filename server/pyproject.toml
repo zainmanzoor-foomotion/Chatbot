@@ -4,4 +4,20 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+  "langchain",
+  "langgraph",
+  "langchain_community",
+  "langchain_groq",
+  "langchain_core",
+  "langchain-cli[inmem]",
+  "fastapi",
+  "uvicorn[standard]",
+  "python-dotenv",
+  "arxiv",
+  "wikipedia",
+  "requests",
+  "langchain-tavily",
+  "tavily-python",
+  "Pillow",
+]
