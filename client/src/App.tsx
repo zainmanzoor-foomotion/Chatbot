@@ -11,6 +11,9 @@ function genId() {
 const initialId = genId()
 
 export default function App() {
+
+  const apiUrl = import.meta.env.VITE_API_URL || '/api'
+
   const [threads, setThreads] = useState<Record<string, Message[]>>({ [initialId]: [] })
   const [currentThreadId, setCurrentThreadId] = useState<string>(initialId)
   const [isResponding, setIsResponding] = useState(false)
@@ -64,7 +67,7 @@ export default function App() {
     setToolStatus(null)
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch(`${apiUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ thread_id: threadId, message, model: selectedModel }),
